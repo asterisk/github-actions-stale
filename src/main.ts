@@ -73,6 +73,7 @@ function _getAndValidateArgs(): IIssuesProcessorOptions {
     daysBeforePrClose: parseInt(core.getInput('days-before-pr-close')),
     staleIssueLabel: core.getInput('stale-issue-label', {required: true}),
     closeIssueLabel: core.getInput('close-issue-label'),
+    onlyMatchingFilter: core.getInput('only-matching-filter'),
     exemptIssueLabels: core.getInput('exempt-issue-labels'),
     stalePrLabel: core.getInput('stale-pr-label', {required: true}),
     closePrLabel: core.getInput('close-pr-label'),

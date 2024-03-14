@@ -272,6 +272,7 @@ exports.Issue = void 0;
 const is_labeled_1 = __nccwpck_require__(6792);
 const is_pull_request_1 = __nccwpck_require__(5400);
 const operations_1 = __nccwpck_require__(7957);
+const owner_repo_1 = __nccwpck_require__(6226);
 class Issue {
     constructor(options, issue) {
         this.operations = new operations_1.Operations();
@@ -287,8 +288,10 @@ class Issue {
         this.locked = issue.locked;
         this.milestone = issue.milestone;
         this.assignees = issue.assignees || [];
+        this.repository_url = issue.repository_url;
         this.isStale = (0, is_labeled_1.isLabeled)(this, this.staleLabel);
         this.markedStaleThisRun = false;
+        this.owner_repo = new owner_repo_1.OwnerRepo(issue.repository_url || '');
     }
     get isPullRequest() {
         return (0, is_pull_request_1.isPullRequest)(this);
@@ -426,7 +429,7 @@ class IssuesProcessor {
         var _a, _b;
         return __awaiter(this, void 0, void 0, function* () {
             // get the next batch of issues
-            const issues = yield this.getIssues(page);
+            const issues = yield this.getIssuesWrapper(page);
             if (issues.length <= 0) {
                 this._logger.info(logger_service_1.LoggerService.green(`No more issues found to process. Exiting...`));
                 (_a = this.statistics) === null || _a === void 0 ? void 0 : _a.setOperationsCount(this.operations.getConsumedOperationsCount()).logStats();
@@ -659,8 +662,8 @@ class IssuesProcessor {
                 this._consumeIssueOperation(issue);
                 (_a = this.statistics) === null || _a === void 0 ? void 0 : _a.incrementFetchedItemsCommentsCount();
                 const comments = yield this.client.rest.issues.listComments({
-                    owner: github_1.context.repo.owner,
-                    repo: github_1.context.repo.repo,
+                    owner: issue.owner_repo.owner,
+                    repo: issue.owner_repo.repo,
                     issue_number: issue.number,
                     since: sinceDate
                 });
@@ -687,11 +690,60 @@ class IssuesProcessor {
                     page
                 });
                 (_a = this.statistics) === null || _a === void 0 ? void 0 : _a.incrementFetchedItemsCount(issueResult.data.length);
+                this._logger.info(logger_service_1.LoggerService.green(`Retrieved ${issueResult.data.length} issues/PRs for repo ${github_1.context.repo.owner}/${github_1.context.repo.repo}`));
                 return issueResult.data.map((issue) => new issue_1.Issue(this.options, issue));
             }
             catch (error) {
                 throw Error(`Getting issues was blocked by the error: ${error.message}`);
             }
+        });
+    }
+    // grab issues and/or prs from github in batches of 100 using search filter
+    getIssuesByFilter(page, search) {
+        var _a;
+        return __awaiter(this, void 0, void 0, function* () {
+            try {
+                this.operations.consumeOperation();
+                const issueResult = yield this.client.rest.search.issuesAndPullRequests({
+                    q: search,
+                    per_page: 100,
+                    direction: this.options.ascending ? 'asc' : 'desc',
+                    page
+                });
+                (_a = this.statistics) === null || _a === void 0 ? void 0 : _a.incrementFetchedItemsCount(issueResult.data.total_count);
+                this._logger.info(logger_service_1.LoggerService.green(`Retrieved ${issueResult.data.total_count} issues/PRs for search '${search}'`));
+                return issueResult.data.items.map((issue) => new issue_1.Issue(this.options, issue));
+            }
+            catch (error) {
+                throw Error(`Getting issues was blocked by the error: ${error.message}`);
+            }
+        });
+    }
+    _removeDupIssues(issues) {
+        return issues.reduce(function (a, b) {
+            if (!a.find(o => o.number == b.number))
+                a.push(b);
+            return a;
+        }, []);
+    }
+    getIssuesWrapper(page) {
+        return __awaiter(this, void 0, void 0, function* () {
+            if (!this.options.onlyMatchingFilter) {
+                return this.getIssues(page);
+            }
+            const filter = this.options.onlyMatchingFilter;
+            const results = [];
+            for (let term of filter.split('||')) {
+                if (term.search(/repo:|owner:|org:|user:/) < 0) {
+                    term = `repo:${github_1.context.repo.owner}/${github_1.context.repo.repo} ${this.options.onlyMatchingFilter}`;
+                }
+                if (term.search(/is:open/) < 0) {
+                    term += ' is:open';
+                }
+                const r = yield this.getIssuesByFilter(page, term);
+                results.push(...r);
+            }
+            return this._removeDupIssues(results);
         });
     }
     // returns the creation date of a given label on an issue (or nothing if no label existed)
@@ -704,8 +756,8 @@ class IssuesProcessor {
             this._consumeIssueOperation(issue);
             (_a = this.statistics) === null || _a === void 0 ? void 0 : _a.incrementFetchedItemsEventsCount();
             const options = this.client.rest.issues.listEvents.endpoint.merge({
-                owner: github_1.context.repo.owner,
-                repo: github_1.context.repo.repo,
+                owner: issue.owner_repo.owner,
+                repo: issue.owner_repo.repo,
                 per_page: 100,
                 issue_number: issue.number
             });
@@ -728,8 +780,8 @@ class IssuesProcessor {
                 this._consumeIssueOperation(issue);
                 (_a = this.statistics) === null || _a === void 0 ? void 0 : _a.incrementFetchedPullRequestsCount();
                 const pullRequest = yield this.client.rest.pulls.get({
-                    owner: github_1.context.repo.owner,
-                    repo: github_1.context.repo.repo,
+                    owner: issue.owner_repo.owner,
+                    repo: issue.owner_repo.repo,
                     pull_number: issue.number
                 });
                 return pullRequest.data;
@@ -848,8 +900,8 @@ class IssuesProcessor {
                     (_a = this.statistics) === null || _a === void 0 ? void 0 : _a.incrementAddedItemsComment(issue);
                     if (!this.options.debugOnly) {
                         yield this.client.rest.issues.createComment({
-                            owner: github_1.context.repo.owner,
-                            repo: github_1.context.repo.repo,
+                            owner: issue.owner_repo.owner,
+                            repo: issue.owner_repo.repo,
                             issue_number: issue.number,
                             body: staleMessage
                         });
@@ -865,8 +917,8 @@ class IssuesProcessor {
                 (_c = this.statistics) === null || _c === void 0 ? void 0 : _c.incrementStaleItemsCount(issue);
                 if (!this.options.debugOnly) {
                     yield this.client.rest.issues.addLabels({
-                        owner: github_1.context.repo.owner,
-                        repo: github_1.context.repo.repo,
+                        owner: issue.owner_repo.owner,
+                        repo: issue.owner_repo.repo,
                         issue_number: issue.number,
                         labels: [staleLabel]
                     });
@@ -891,8 +943,8 @@ class IssuesProcessor {
                     this.addedCloseCommentIssues.push(issue);
                     if (!this.options.debugOnly) {
                         yield this.client.rest.issues.createComment({
-                            owner: github_1.context.repo.owner,
-                            repo: github_1.context.repo.repo,
+                            owner: issue.owner_repo.owner,
+                            repo: issue.owner_repo.repo,
                             issue_number: issue.number,
                             body: closeMessage
                         });
@@ -908,8 +960,8 @@ class IssuesProcessor {
                     (_b = this.statistics) === null || _b === void 0 ? void 0 : _b.incrementAddedItemsLabel(issue);
                     if (!this.options.debugOnly) {
                         yield this.client.rest.issues.addLabels({
-                            owner: github_1.context.repo.owner,
-                            repo: github_1.context.repo.repo,
+                            owner: issue.owner_repo.owner,
+                            repo: issue.owner_repo.repo,
                             issue_number: issue.number,
                             labels: [closeLabel]
                         });
@@ -924,8 +976,8 @@ class IssuesProcessor {
                 (_c = this.statistics) === null || _c === void 0 ? void 0 : _c.incrementClosedItemsCount(issue);
                 if (!this.options.debugOnly) {
                     yield this.client.rest.issues.update({
-                        owner: github_1.context.repo.owner,
-                        repo: github_1.context.repo.repo,
+                        owner: issue.owner_repo.owner,
+                        repo: issue.owner_repo.repo,
                         issue_number: issue.number,
                         state: 'closed',
                         state_reason: this.options.closeIssueReason || undefined
@@ -955,15 +1007,15 @@ class IssuesProcessor {
             const branch = pullRequest.head.ref;
             if (pullRequest.head.repo === null ||
                 pullRequest.head.repo.full_name ===
-                    `${github_1.context.repo.owner}/${github_1.context.repo.repo}`) {
+                    `${issue.owner_repo.owner}/${issue.owner_repo.repo}`) {
                 issueLogger.info(`Deleting the branch "${logger_service_1.LoggerService.cyan(branch)}" from closed $$type`);
                 try {
                     this._consumeIssueOperation(issue);
                     (_a = this.statistics) === null || _a === void 0 ? void 0 : _a.incrementDeletedBranchesCount();
                     if (!this.options.debugOnly) {
                         yield this.client.rest.git.deleteRef({
-                            owner: github_1.context.repo.owner,
-                            repo: github_1.context.repo.repo,
+                            owner: issue.owner_repo.owner,
+                            repo: issue.owner_repo.repo,
                             ref: `heads/${branch}`
                         });
                     }
@@ -989,8 +1041,8 @@ class IssuesProcessor {
                 (_a = this.statistics) === null || _a === void 0 ? void 0 : _a.incrementDeletedItemsLabelsCount(issue);
                 if (!this.options.debugOnly) {
                     yield this.client.rest.issues.removeLabel({
-                        owner: github_1.context.repo.owner,
-                        repo: github_1.context.repo.repo,
+                        owner: issue.owner_repo.owner,
+                        repo: issue.owner_repo.repo,
                         issue_number: issue.number,
                         name: label
                     });
@@ -1089,8 +1141,8 @@ class IssuesProcessor {
                 (_a = this.statistics) === null || _a === void 0 ? void 0 : _a.incrementAddedItemsLabel(issue);
                 if (!this.options.debugOnly) {
                     yield this.client.rest.issues.addLabels({
-                        owner: github_1.context.repo.owner,
-                        repo: github_1.context.repo.repo,
+                        owner: issue.owner_repo.owner,
+                        repo: issue.owner_repo.repo,
                         issue_number: issue.number,
                         labels: labelsToAdd
                     });
@@ -1497,6 +1549,31 @@ class Operations {
     }
 }
 exports.Operations = Operations;
+
+
+/***/ }),
+
+/***/ 6226:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.OwnerRepo = void 0;
+class OwnerRepo {
+    constructor(repo_url) {
+        const m = repo_url.match(/.*\/([^/]+)\/(.+)$/);
+        if (!m) {
+            this.owner = '';
+            this.repo = '';
+        }
+        else {
+            this.owner = m[1];
+            this.repo = m[2];
+        }
+    }
+}
+exports.OwnerRepo = OwnerRepo;
 
 
 /***/ }),
@@ -2185,6 +2262,7 @@ var Option;
     Option["DaysBeforePrClose"] = "days-before-pr-close";
     Option["StaleIssueLabel"] = "stale-issue-label";
     Option["CloseIssueLabel"] = "close-issue-label";
+    Option["OnlyMatchingFilter"] = "only-matching-filter";
     Option["ExemptIssueLabels"] = "exempt-issue-labels";
     Option["StalePrLabel"] = "stale-pr-label";
     Option["ClosePrLabel"] = "close-pr-label";
@@ -2526,6 +2604,7 @@ function _getAndValidateArgs() {
         daysBeforePrClose: parseInt(core.getInput('days-before-pr-close')),
         staleIssueLabel: core.getInput('stale-issue-label', { required: true }),
         closeIssueLabel: core.getInput('close-issue-label'),
+        onlyMatchingFilter: core.getInput('only-matching-filter'),
         exemptIssueLabels: core.getInput('exempt-issue-labels'),
         stalePrLabel: core.getInput('stale-pr-label', { required: true }),
         closePrLabel: core.getInput('close-pr-label'),

@@ -60,6 +60,7 @@ Every argument is optional.
 | [close-issue-reason](#close-issue-reason)                           | Reason to use when closing issues                                           | `not_planned`         |
 | [stale-pr-label](#stale-pr-label)                                   | Label to apply on staled PRs                                                | `Stale`               |
 | [close-pr-label](#close-pr-label)                                   | Label to apply on closed PRs                                                |                       |
+| [only-matching-filter](#only-matching-filter)                       | Only issues/PRs matching the search filter(s) will be retrieved and tested  |                       |
 | [exempt-issue-labels](#exempt-issue-labels)                         | Labels on issues exempted from stale                                        |                       |
 | [exempt-pr-labels](#exempt-pr-labels)                               | Labels on PRs exempted from stale                                           |                       |
 | [only-labels](#only-labels)                                         | Only issues/PRs with ALL these labels are checked                           |                       |
@@ -257,6 +258,24 @@ It will be automatically removed if the pull requests are no longer closed nor l
 
 Default value: unset  
 Required Permission: `pull-requests: write`
+
+#### only-matching-filter
+
+One or more standard [GitHub Issues and Pull Requests search filters](https://docs.github.com/en/search-github/searching-on-github/searching-issues-and-pull-requests)
+which will be used to retrieve the set of issues/PRs to test and take action on.  Normally, all open issues/PRs in the context's owner/repo are retrieved.
+
+GitHub only allows boolean logic and grouping in a Code Search not in Issues and Pull Requests search so there's no way to do an "OR" operation but you can get around this to
+a limited degree by specifying multiple search requests separated by ` || `.  Each request is run separately and the results are accumulated and duplicates
+removed before any further processing is done.
+
+Each request is checked to ensure it contains an `owner:`, `org:`, `user:` or `repo:` search term.  If it doesn't, the search will automatically be scoped to
+the owner and repository in the context.  This prevents accidental global searches.  If the request doesn't already contain an `is:open` search term, it will automatically be added as well.
+
+Example: To retrieve all of the open PRs in your organization that have a review state of `changes_requested` or a label named `submitter-action-required`, you'd use:
+`only-matching-filter: 'org:myorg is:pr is:open review:changes_requested || org:myorg is:pr is:open label:submitter-action-required'`.
+From this set, all of the other label, milestone, date, assignee, etc. filters will be applied before taking any action.
+
+Default value: unset  
 
 #### exempt-issue-labels
 
