@@ -98,7 +98,7 @@ Every argument is optional.
 | [ignore-issue-updates](#ignore-issue-updates)                       | Override [ignore-updates](#ignore-updates) for issues only                  |                       |
 | [ignore-pr-updates](#ignore-pr-updates)                             | Override [ignore-updates](#ignore-updates) for PRs only                     |                       |
 | [include-only-assigned](#include-only-assigned)                     | Process only assigned issues                                                | `false`               |
-
+| [json-config](#json-config)                                         | Instead of specifying individual options, specify a single JSON file with all of them                                            |                   |
 ### List of output options
 
 | Output            | Description                                 |
@@ -565,6 +565,18 @@ Default value: unset
 If set to `true`, only the issues or the pull requests with an assignee will be marked as stale automatically.
 
 Default value: `false`
+
+#### json-config
+
+This action has a lot of individual options that can be set.  If you need to set them from an external source,
+like actions variables, it can be a lot of work. Instead you can create a single JSON document
+with all of the options you want, save it as a single actions variable, then specify it here like so:
+
+`json-config: ${{ vars.STALE_ISSUE_CONFIG }}`
+
+When executed, the action will take the individual option defaults
+first, then apply the JSON document over them, then apply any
+individual options specified.
 
 ### Usage
 

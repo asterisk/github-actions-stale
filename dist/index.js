@@ -733,13 +733,7 @@ class IssuesProcessor {
             }
             const filter = this.options.onlyMatchingFilter;
             const results = [];
-            for (let term of filter.split('||')) {
-                if (term.search(/repo:|owner:|org:|user:/) < 0) {
-                    term = `repo:${github_1.context.repo.owner}/${github_1.context.repo.repo} ${this.options.onlyMatchingFilter}`;
-                }
-                if (term.search(/is:open/) < 0) {
-                    term += ' is:open';
-                }
+            for (const term of filter) {
                 const r = yield this.getIssuesByFilter(page, term);
                 results.push(...r);
             }
@@ -2558,6 +2552,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 const core = __importStar(__nccwpck_require__(2186));
+const github_1 = __nccwpck_require__(5438);
 const issues_processor_1 = __nccwpck_require__(3292);
 const is_valid_date_1 = __nccwpck_require__(891);
 const state_service_1 = __nccwpck_require__(6330);
@@ -2589,83 +2584,185 @@ function _run() {
         }
     });
 }
-function _getAndValidateArgs() {
+function _getDefaultArgs() {
     const args = {
-        repoToken: core.getInput('repo-token'),
-        staleIssueMessage: core.getInput('stale-issue-message'),
-        stalePrMessage: core.getInput('stale-pr-message'),
-        closeIssueMessage: core.getInput('close-issue-message'),
-        closePrMessage: core.getInput('close-pr-message'),
-        daysBeforeStale: parseFloat(core.getInput('days-before-stale', { required: true })),
-        daysBeforeIssueStale: parseFloat(core.getInput('days-before-issue-stale')),
-        daysBeforePrStale: parseFloat(core.getInput('days-before-pr-stale')),
-        daysBeforeClose: parseInt(core.getInput('days-before-close', { required: true })),
-        daysBeforeIssueClose: parseInt(core.getInput('days-before-issue-close')),
-        daysBeforePrClose: parseInt(core.getInput('days-before-pr-close')),
-        staleIssueLabel: core.getInput('stale-issue-label', { required: true }),
-        closeIssueLabel: core.getInput('close-issue-label'),
-        onlyMatchingFilter: core.getInput('only-matching-filter'),
-        exemptIssueLabels: core.getInput('exempt-issue-labels'),
-        stalePrLabel: core.getInput('stale-pr-label', { required: true }),
-        closePrLabel: core.getInput('close-pr-label'),
-        exemptPrLabels: core.getInput('exempt-pr-labels'),
-        onlyLabels: core.getInput('only-labels'),
-        onlyIssueLabels: core.getInput('only-issue-labels'),
-        onlyPrLabels: core.getInput('only-pr-labels'),
-        anyOfLabels: core.getInput('any-of-labels'),
-        anyOfIssueLabels: core.getInput('any-of-issue-labels'),
-        anyOfPrLabels: core.getInput('any-of-pr-labels'),
-        operationsPerRun: parseInt(core.getInput('operations-per-run', { required: true })),
-        removeStaleWhenUpdated: !(core.getInput('remove-stale-when-updated') === 'false'),
+        repoToken: '',
+        staleIssueMessage: '',
+        stalePrMessage: '',
+        closeIssueMessage: '',
+        closePrMessage: '',
+        daysBeforeStale: 60.0,
+        daysBeforeIssueStale: NaN,
+        daysBeforePrStale: NaN,
+        daysBeforeClose: 7,
+        daysBeforeIssueClose: NaN,
+        daysBeforePrClose: NaN,
+        staleIssueLabel: 'Stale',
+        closeIssueLabel: '',
+        exemptIssueLabels: '',
+        stalePrLabel: 'Stale',
+        closePrLabel: '',
+        exemptPrLabels: '',
+        onlyLabels: '',
+        onlyIssueLabels: '',
+        onlyPrLabels: '',
+        anyOfLabels: '',
+        anyOfIssueLabels: '',
+        anyOfPrLabels: '',
+        operationsPerRun: 30,
+        removeStaleWhenUpdated: true,
+        removeIssueStaleWhenUpdated: undefined,
+        removePrStaleWhenUpdated: undefined,
+        debugOnly: false,
+        ascending: false,
+        deleteBranch: false,
+        startDate: undefined,
+        exemptMilestones: '',
+        exemptIssueMilestones: '',
+        exemptPrMilestones: '',
+        exemptAllMilestones: false,
+        exemptAllIssueMilestones: undefined,
+        exemptAllPrMilestones: undefined,
+        exemptAssignees: '',
+        exemptIssueAssignees: '',
+        exemptPrAssignees: '',
+        exemptAllAssignees: false,
+        exemptAllIssueAssignees: undefined,
+        exemptAllPrAssignees: undefined,
+        enableStatistics: true,
+        labelsToRemoveWhenStale: '',
+        labelsToRemoveWhenUnstale: '',
+        labelsToAddWhenUnstale: '',
+        ignoreUpdates: false,
+        ignoreIssueUpdates: undefined,
+        ignorePrUpdates: undefined,
+        exemptDraftPr: false,
+        closeIssueReason: 'not_planned',
+        includeOnlyAssigned: false,
+        onlyMatchingFilter: []
+    };
+    return args;
+}
+function _getInputArgs() {
+    const args = {
+        repoToken: _toOptionalString('repo-token'),
+        staleIssueMessage: _toOptionalString('stale-issue-message'),
+        stalePrMessage: _toOptionalString('stale-pr-message'),
+        closeIssueMessage: _toOptionalString('close-issue-message'),
+        closePrMessage: _toOptionalString('close-pr-message'),
+        daysBeforeStale: _toOptionalFloat('days-before-stale'),
+        daysBeforeIssueStale: _toOptionalFloat('days-before-issue-stale'),
+        daysBeforePrStale: _toOptionalFloat('days-before-pr-stale'),
+        daysBeforeClose: _toOptionalInt('days-before-close'),
+        daysBeforeIssueClose: _toOptionalInt('days-before-issue-close'),
+        daysBeforePrClose: _toOptionalInt('days-before-pr-close'),
+        staleIssueLabel: _toOptionalString('stale-issue-label'),
+        closeIssueLabel: _toOptionalString('close-issue-label'),
+        exemptIssueLabels: _toOptionalString('exempt-issue-labels'),
+        stalePrLabel: _toOptionalString('stale-pr-label'),
+        closePrLabel: _toOptionalString('close-pr-label'),
+        exemptPrLabels: _toOptionalString('exempt-pr-labels'),
+        onlyLabels: _toOptionalString('only-labels'),
+        onlyIssueLabels: _toOptionalString('only-issue-labels'),
+        onlyPrLabels: _toOptionalString('only-pr-labels'),
+        anyOfLabels: _toOptionalString('any-of-labels'),
+        anyOfIssueLabels: _toOptionalString('any-of-issue-labels'),
+        anyOfPrLabels: _toOptionalString('any-of-pr-labels'),
+        operationsPerRun: _toOptionalInt('operations-per-run'),
+        removeStaleWhenUpdated: _toOptionalBoolean('remove-stale-when-updated'),
         removeIssueStaleWhenUpdated: _toOptionalBoolean('remove-issue-stale-when-updated'),
         removePrStaleWhenUpdated: _toOptionalBoolean('remove-pr-stale-when-updated'),
-        debugOnly: core.getInput('debug-only') === 'true',
-        ascending: core.getInput('ascending') === 'true',
-        deleteBranch: core.getInput('delete-branch') === 'true',
-        startDate: core.getInput('start-date') !== ''
-            ? core.getInput('start-date')
-            : undefined,
-        exemptMilestones: core.getInput('exempt-milestones'),
-        exemptIssueMilestones: core.getInput('exempt-issue-milestones'),
-        exemptPrMilestones: core.getInput('exempt-pr-milestones'),
-        exemptAllMilestones: core.getInput('exempt-all-milestones') === 'true',
+        debugOnly: _toOptionalBoolean('debug-only'),
+        ascending: _toOptionalBoolean('ascending'),
+        deleteBranch: _toOptionalBoolean('delete-branch'),
+        startDate: _toOptionalString('start-date'),
+        exemptMilestones: _toOptionalString('exempt-milestones'),
+        exemptIssueMilestones: _toOptionalString('exempt-issue-milestones'),
+        exemptPrMilestones: _toOptionalString('exempt-pr-milestones'),
+        exemptAllMilestones: _toOptionalBoolean('exempt-all-milestones'),
         exemptAllIssueMilestones: _toOptionalBoolean('exempt-all-issue-milestones'),
         exemptAllPrMilestones: _toOptionalBoolean('exempt-all-pr-milestones'),
-        exemptAssignees: core.getInput('exempt-assignees'),
-        exemptIssueAssignees: core.getInput('exempt-issue-assignees'),
-        exemptPrAssignees: core.getInput('exempt-pr-assignees'),
-        exemptAllAssignees: core.getInput('exempt-all-assignees') === 'true',
+        exemptAssignees: _toOptionalString('exempt-assignees'),
+        exemptIssueAssignees: _toOptionalString('exempt-issue-assignees'),
+        exemptPrAssignees: _toOptionalString('exempt-pr-assignees'),
+        exemptAllAssignees: _toOptionalBoolean('exempt-all-assignees'),
         exemptAllIssueAssignees: _toOptionalBoolean('exempt-all-issue-assignees'),
         exemptAllPrAssignees: _toOptionalBoolean('exempt-all-pr-assignees'),
-        enableStatistics: core.getInput('enable-statistics') === 'true',
-        labelsToRemoveWhenStale: core.getInput('labels-to-remove-when-stale'),
-        labelsToRemoveWhenUnstale: core.getInput('labels-to-remove-when-unstale'),
-        labelsToAddWhenUnstale: core.getInput('labels-to-add-when-unstale'),
-        ignoreUpdates: core.getInput('ignore-updates') === 'true',
+        enableStatistics: _toOptionalBoolean('enable-statistics'),
+        labelsToRemoveWhenStale: _toOptionalString('labels-to-remove-when-stale'),
+        labelsToRemoveWhenUnstale: _toOptionalString('labels-to-remove-when-unstale'),
+        labelsToAddWhenUnstale: _toOptionalString('labels-to-add-when-unstale'),
+        ignoreUpdates: _toOptionalBoolean('ignore-updates'),
         ignoreIssueUpdates: _toOptionalBoolean('ignore-issue-updates'),
         ignorePrUpdates: _toOptionalBoolean('ignore-pr-updates'),
-        exemptDraftPr: core.getInput('exempt-draft-pr') === 'true',
-        closeIssueReason: core.getInput('close-issue-reason'),
-        includeOnlyAssigned: core.getInput('include-only-assigned') === 'true'
+        exemptDraftPr: _toOptionalBoolean('exempt-draft-pr'),
+        closeIssueReason: _toOptionalString('close-issue-reason'),
+        includeOnlyAssigned: _toOptionalBoolean('include-only-assigned'),
+        onlyMatchingFilter: _toOptionalStringArray('only-matching-filter')
     };
-    for (const numberInput of ['days-before-stale']) {
-        if (isNaN(parseFloat(core.getInput(numberInput)))) {
+    return args;
+}
+function _getJSONArgs(json_config) {
+    const json = JSON.parse(json_config || '{}');
+    const args = {};
+    for (const key in json) {
+        const newkey = key.replace(/([-_]\w)/g, g => g[1].toUpperCase());
+        args[newkey] = json[key];
+    }
+    return args;
+}
+function _mergeArgs(into, ...args) {
+    for (const inarg of args) {
+        for (const k in inarg) {
+            const key = k;
+            const val = inarg[key];
+            if (val == undefined ||
+                (typeof val == 'number' && isNaN(val)) ||
+                (typeof val == 'string' && val.length == 0)) {
+                continue;
+            }
+            into[key] = val;
+        }
+    }
+    return into;
+}
+function _getAndValidateArgs() {
+    const default_args = _getDefaultArgs();
+    const input_args = _getInputArgs();
+    const json_args = _getJSONArgs(core.getInput('json-config'));
+    const args = _mergeArgs(default_args, input_args, json_args);
+    console.log(args.onlyMatchingFilter);
+    const new_omf = [];
+    for (let term of args.onlyMatchingFilter) {
+        if (term.search(/repo:|owner:|org:|user:/) < 0) {
+            term = `repo:${github_1.context.repo.owner}/${github_1.context.repo.repo} ${term}`;
+        }
+        if (term.search(/is:open/) < 0) {
+            term += ' is:open';
+        }
+        new_omf.push(term);
+    }
+    console.log({ "newomf": new_omf });
+    args.onlyMatchingFilter = [];
+    core.info(JSON.stringify(args, null, 2));
+    for (const numberInput of [args.daysBeforeStale]) {
+        if (isNaN(numberInput)) {
             const errorMessage = `Option "${numberInput}" did not parse to a valid float`;
             core.setFailed(errorMessage);
             throw new Error(errorMessage);
         }
     }
-    for (const numberInput of ['days-before-close', 'operations-per-run']) {
-        if (isNaN(parseInt(core.getInput(numberInput)))) {
+    for (const numberInput of [args.daysBeforeClose, args.operationsPerRun]) {
+        if (isNaN(numberInput)) {
             const errorMessage = `Option "${numberInput}" did not parse to a valid integer`;
             core.setFailed(errorMessage);
             throw new Error(errorMessage);
         }
     }
-    for (const optionalDateInput of ['start-date']) {
+    for (const optionalDateInput of [args.startDate || '']) {
         // Ignore empty dates because it is considered as the right type for a default value (so a valid one)
-        if (core.getInput(optionalDateInput) !== '') {
-            if (!(0, is_valid_date_1.isValidDate)(new Date(core.getInput(optionalDateInput)))) {
+        if (optionalDateInput !== '') {
+            if (!(0, is_valid_date_1.isValidDate)(new Date(optionalDateInput))) {
                 const errorMessage = `Option "${optionalDateInput}" did not parse to a valid date`;
                 core.setFailed(errorMessage);
                 throw new Error(errorMessage);
@@ -2706,6 +2803,70 @@ function _toOptionalBoolean(argumentName) {
         return false;
     }
     return undefined;
+}
+/**
+ * @description
+ * From an argument name, get the value as an optional float
+ * This is very useful for all the arguments that override others
+ * It will allow us to easily use the original one when the return value is `undefined`
+ *
+ * @param {Readonly<string>} argumentName The name of the argument to check
+ *
+ * @returns {number | undefined} The value matching the given argument name
+ */
+function _toOptionalFloat(argumentName) {
+    const val = core.getInput(argumentName);
+    return parseFloat(val) || undefined;
+}
+/**
+ * @description
+ * From an argument name, get the value as an optional int
+ * This is very useful for all the arguments that override others
+ * It will allow us to easily use the original one when the return value is `undefined`
+ *
+ * @param {Readonly<string>} argumentName The name of the argument to check
+ *
+ * @returns {number | undefined} The value matching the given argument name
+ */
+function _toOptionalInt(argumentName) {
+    const val = core.getInput(argumentName);
+    return parseInt(val) || undefined;
+}
+/**
+ * @description
+ * From an argument name, get the value as an optional string
+ * This is very useful for all the arguments that override others
+ * It will allow us to easily use the original one when the return value is `undefined`
+ *
+ * @param {Readonly<string>} argumentName The name of the argument to check
+ *
+ * @returns {string | undefined} The value matching the given argument name
+ */
+function _toOptionalString(argumentName) {
+    const val = core.getInput(argumentName);
+    return val || undefined;
+}
+/**
+ * @description
+ * From an argument name, get the value as an optional string array
+ * This is very useful for all the arguments that override others
+ * It will allow us to easily use the original one when the return value is `undefined`
+ *
+ * @param {Readonly<string>} argumentName The name of the argument to check
+ *
+ * @returns {string[] | undefined} The value matching the given argument name
+ */
+function _toOptionalStringArray(argumentName) {
+    const val = core.getInput(argumentName);
+    if (!val) {
+        return undefined;
+    }
+    try {
+        return JSON.parse(val);
+    }
+    catch (err) {
+        return [val];
+    }
 }
 void _run();
 

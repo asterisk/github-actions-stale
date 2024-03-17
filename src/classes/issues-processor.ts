@@ -628,13 +628,7 @@ export class IssuesProcessor {
     }
     const filter = this.options.onlyMatchingFilter;
     const results: Issue[] = [];
-    for (let term of filter.split('||')) {
-      if (term.search(/repo:|owner:|org:|user:/) < 0) {
-        term = `repo:${context.repo.owner}/${context.repo.repo} ${this.options.onlyMatchingFilter}`;
-      }
-      if (term.search(/is:open/) < 0) {
-        term += ' is:open';
-      }
+    for (const term of filter) {
       const r: Issue[] = await this.getIssuesByFilter(page, term);
       results.push(...r);
     }
